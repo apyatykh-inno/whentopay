@@ -11,18 +11,23 @@ function saveData() {
 
 function addCard() {
     const nameInput = document.getElementById('card-name');
+    const limitInput = document.getElementById('card-limit');
     const graceInput = document.getElementById('card-grace');
     const typeInput = document.getElementById('card-type');
     
-    if (!nameInput.value || !graceInput.value) return alert('Заполните все поля карты');
+    if (!nameInput.value || !limitInput.value || !graceInput.value) {
+        return alert('Заполните все поля для создания карты');
+    }
     
     cards.push({
         id: Date.now().toString(),
         name: nameInput.value,
+        limit: parseFloat(limitInput.value),
         graceDays: parseInt(graceInput.value),
-        type: typeInput.value // 'purchase' или 'month'
+        type: typeInput.value
     });
-    nameInput.value = ''; graceInput.value = '';
+    
+    nameInput.value = ''; limitInput.value = ''; graceInput.value = '';
     saveData();
 }
 
@@ -34,9 +39,7 @@ function deleteCard(id) {
     }
 }
 
-// ТОЧНЫЙ РАСЧЕТ ДАТЫ ОКОНЧАНИЯ ГРЕЙСА С УЧЕТОМ КАЛЕНДАРНЫХ ДНЕЙ И ТИПА КАРТЫ
 function calculateGraceDeadline(dateStr, graceDays, cardType) {
-    // Используем явные компоненты даты во избежание сдвига часовых поясов JS
     const parts = dateStr.split('-');
     let year = parseInt(parts[0]);
     let month = parseInt(parts[1]) - 1;
@@ -44,20 +47,15 @@ function calculateGraceDeadline(dateStr, graceDays, cardType) {
 
     let baseDate;
     if (cardType === 'month') {
-        // Схема Сбера: расчет идет от 1-го числа текущего месяца
         baseDate = new Date(year, month, 1, 12, 0, 0);
-        // Прибавляем количество дней грейса (день старта является первым)
         baseDate.setDate(baseDate.getDate() + graceDays - 1);
     } else {
-        // Схема Альфа/ВТБ: от даты покупки, ВКЛЮЧАЯ день покупки как первый день
         baseDate = new Date(year, month, day, 12, 0, 0);
         baseDate.setDate(baseDate.getDate() + graceDays - 1);
     }
-
     return baseDate.toISOString().split('T')[0];
 }
 
-// ФУНКЦИЯ АВТОМАТИЧЕСКОГО РАСЧЕТА ДАТЫ МИН. ПЛАТЕЖА (ДО 30-ГО ЧИСЛА)
 function calculateMinPaymentDate(purchaseDateStr) {
     const parts = purchaseDateStr.split('-');
     let year = parseInt(parts[0]);
@@ -67,13 +65,11 @@ function calculateMinPaymentDate(purchaseDateStr) {
     let targetYear = year;
     let targetMonth = month;
     
-    // Если покупка сделана 30-го или 31-го, минимальный платеж уходит на следующий месяц
     if (day >= 30) {
         targetMonth += 1;
         if (targetMonth > 11) { targetMonth = 0; targetYear += 1; }
     }
     
-    // Февраль контролируем отдельно
     if (targetMonth === 1) {
         const isLeap = (targetYear % 4 === 0 && targetYear % 100 !== 0) || (targetYear % 400 === 0);
         return `${targetYear}-02-${isLeap ? '29' : '28'}`;
@@ -86,7 +82,7 @@ function calculateMinPaymentDate(purchaseDateStr) {
 function addTransaction() {
     const cardId = document.getElementById('tx-card').value;
     const amount = parseFloat(document.getElementById('tx-amount').value);
-    const dateValue = document.getElementById('tx-date').value; // 'YYYY-MM-DD'
+    const dateValue = document.getElementById('tx-date').value;
     
     if (!cardId || isNaN(amount) || !dateValue) return alert('Заполните корректно данные о покупке');
     
@@ -112,7 +108,7 @@ function editTransaction(id) {
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
 
-    const newAmount = prompt(`Редактирование.\nВведите новую сумму (текущая: ${tx.amount} ₽):`, tx.amount);
+    const newAmount = prompt(`Редактирование расхода.\nВведите новую сумму (текущая: ${tx.amount} ₽):`, tx.amount);
     if (newAmount === null) return;
     const parsedAmount = parseFloat(newAmount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) return alert('Некорректная сумма');
@@ -142,37 +138,75 @@ function deleteTransaction(id) {
 }
 
 function renderAll() {
+    // Селектор карт
     const txCardSelect = document.getElementById('tx-card');
     txCardSelect.innerHTML = cards.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
+    // Калькуляция задолженностей по картам
+    const cardStats = {};
+    cards.forEach(c => {
+        cardStats[c.id] = { totalSpent: 0, totalMinPay: 0, earliestDeadline: null, minPayDeadline: null };
+    });
+    
+    transactions.forEach(t => {
+        if (cardStats[t.cardId]) {
+            cardStats[t.cardId].totalSpent += t.amount;
+            cardStats[t.cardId].totalMinPay += t.minPaymentAmount;
+            
+            if (!cardStats[t.cardId].earliestDeadline || new Date(t.deadline) < new Date(cardStats[t.cardId].earliestDeadline)) {
+                cardStats[t.cardId].earliestDeadline = t.deadline;
+            }
+            if (!cardStats[t.cardId].minPayDeadline || new Date(t.minPaymentDeadline) < new Date(cardStats[t.cardId].minPayDeadline)) {
+                cardStats[t.cardId].minPayDeadline = t.minPaymentDeadline;
+            }
+        }
+    });
+
+    // Список карт в управлении
     const cardsManageList = document.getElementById('cards-manage-list');
     if(cards.length === 0) {
         cardsManageList.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem;">Карт пока нет.</p>`;
     } else {
-        cardsManageList.innerHTML = cards.map(c => `
-            <div class="card card-manage-item">
-                <span><strong>${c.name}</strong> (${c.graceDays} дн., ${c.type === 'purchase' ? 'от покупки' : 'с 1-го числа'})</span>
-                <button class="btn-danger-card" onclick="deleteCard('${c.id}')">Удалить</button>
-            </div>
-        `).join('');
+        cardsManageList.innerHTML = cards.map(c => {
+            const spent = cardStats[c.id] ? cardStats[c.id].totalSpent : 0;
+            const remainingLimit = c.limit - spent;
+            return `
+                <div class="card card-manage-item">
+                    <span><strong>${c.name}</strong><br>
+                    <small style="color: var(--text-muted);">Лимит: ${c.limit.toLocaleString()} ₽ | Доступно: ${remainingLimit.toLocaleString()} ₽</small></span>
+                    <button class="btn-danger-card" onclick="deleteCard('${c.id}')">Удалить</button>
+                </div>
+            `;
+        }).join('');
     }
 
+    // Общий долг
     const totalDebt = transactions.reduce((sum, t) => sum + t.amount, 0);
     document.getElementById('total-debt').innerText = totalDebt.toLocaleString('ru-RU') + ' ₽';
 
+    // РЕНДЕРИНГ СВОДНОГО ТАЙМЛАЙНА ПО КАРТАМ
     const timelineList = document.getElementById('timeline-list');
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    const sortedTxs = [...transactions].sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
-    
-    if(sortedTxs.length === 0) {
-        timelineList.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem;">Ближайших выплат нет.</p>`;
+    const activeCardsData = cards.map(c => {
+        const stats = cardStats[c.id];
+        return { card: c, stats: stats };
+    }).filter(item => item.stats && item.stats.totalSpent > 0)
+      .sort((a, b) => {
+          if (!a.stats.earliestDeadline) return 1;
+          if (!b.stats.earliestDeadline) return -1;
+          return new Date(a.stats.earliestDeadline) - new Date(b.stats.earliestDeadline);
+      });
+
+    if(activeCardsData.length === 0) {
+        timelineList.innerHTML = `<p style="color:var(--text-muted); font-size:0.9rem;">Нет активных задолженностей по картам.</p>`;
     } else {
-        timelineList.innerHTML = sortedTxs.map(t => {
-            const tDeadline = new Date(t.deadline);
-            tDeadline.setHours(0,0,0,0);
-            const diffDays = Math.ceil((tDeadline - today) / (1000 * 60 * 60 * 24));
+        timelineList.innerHTML = activeCardsData.map(item => {
+            const c = item.card;
+            const s = item.stats;
+            const diffDays = Math.ceil((new Date(s.earliestDeadline) - today) / (1000 * 60 * 60 * 24));
+            const remainingLimit = c.limit - s.totalSpent;
             
             let statusClass = '';
             if (diffDays <= 7) statusClass = 'status-danger';
@@ -181,14 +215,14 @@ function renderAll() {
             return `
                 <div class="card payment-item ${statusClass}">
                     <div class="payment-info">
-                        <h4>${t.cardName}</h4>
-                        <p>Покупка от ${formatDate(t.date)}<br>
-                        🔹 Обязательный мин. платеж: <strong>${t.minPaymentAmount.toLocaleString('ru-RU')} ₽</strong> до ${formatDate(t.minPaymentDeadline)}</p>
+                        <h4>${c.name}</h4>
+                        <p>🔹 Обязательный мин. платеж: <strong>${s.totalMinPay.toLocaleString('ru-RU')} ₽</strong> до ${formatDate(s.minPayDeadline)}<br>
+                        💳 Остаток лимита: <strong>${remainingLimit.toLocaleString('ru-RU')} ₽</strong> из ${c.limit.toLocaleString()} ₽</p>
                     </div>
                     <div class="payment-amount">
-                        ${t.amount.toLocaleString('ru-RU')} ₽
+                        ${s.totalSpent.toLocaleString('ru-RU')} ₽
                         <span class="days-left ${diffDays <= 7 ? 'danger-text' : (diffDays <= 30 ? 'warning-text' : 'success-text')}">
-                            Полный возврат до ${formatDate(t.deadline)} (${diffDays < 0 ? 'Просрочено' : 'Осталось дней: ' + diffDays})
+                            Полный возврат до ${formatDate(s.earliestDeadline)} (${diffDays < 0 ? 'Просрочено' : 'Осталось дней: ' + diffDays})
                         </span>
                     </div>
                 </div>
@@ -196,7 +230,10 @@ function renderAll() {
         }).join('');
     }
 
+    // Детализация расходов (Таблица)
     const tableBody = document.getElementById('transactions-table-body');
+    const sortedTxs = [...transactions].sort((a, b) => new Date(a.deadline) - new Date(b.deadline));
+    
     if(transactions.length === 0) {
         tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>`;
     } else {
@@ -204,21 +241,3 @@ function renderAll() {
             <tr>
                 <td><strong>${t.cardName}</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ${formatDate(t.date)}</span></td>
                 <td>${t.amount.toLocaleString('ru-RU')} ₽</td>
-                <td>${t.minPaymentAmount.toLocaleString('ru-RU')} ₽<br><span style="color:var(--text-muted); font-size:0.75rem;">до ${formatDate(t.minPaymentDeadline)}</span></td>
-                <td>${formatDate(t.deadline)}</td>
-                <td class="td-actions">
-                    <button class="btn-action edit" onclick="editTransaction('${t.id}')">Изм.</button>
-                    <button class="btn-action delete" onclick="deleteTransaction('${t.id}')">Уд.</button>
-                </td>
-            </tr>
-        `).join('');
-    }
-}
-
-function formatDate(dateString) {
-    const parts = dateString.split('-');
-    if (parts.length !== 3) return dateString;
-    return `${parts[2]}.${parts[1]}.${parts[0]}`;
-}
-
-renderAll();
