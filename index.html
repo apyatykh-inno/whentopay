@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>whentopay tracking</title>
     
-    <!-- Иконка кредитной карты на вкладке браузера -->
+    <!-- Фирменный Favicon Кредитная карта 💳 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💳</text></svg>">
     
     <style>
@@ -21,19 +21,20 @@
         }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 15px; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        h1, h2, h3 { margin-top: 0; }
+        h1, h2, h3, h4 { margin-top: 0; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
         th { background: rgba(0,0,0,0.02); color: var(--text-muted); }
         
-        .td-actions { display: flex; gap: 6px; justify-content: center; }
-        .btn-action { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #fff; }
+        /* Стилизация компактных кнопок-значков действий */
+        .td-actions { display: flex; gap: 6px; justify-content: center; align-items: center; }
+        .btn-action { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; background: #fff; transition: background 0.2s; padding: 0; }
         .btn-action:hover { background: #f1f2f6; }
         .edit-icon { color: var(--text-main); }
         .delete-icon { color: var(--danger); background: #fff0f0; border-color: #fcdcdc; }
         .delete-icon:hover { background: var(--danger); color: #fff; }
-        .btn-danger-card { background: var(--danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
         
+        .btn-danger-card { background: var(--danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
         .status-danger { border-left: 5px solid var(--danger); }
         .status-warning { border-left: 5px solid var(--warning); }
         .danger-text { color: var(--danger); font-weight: bold; }
@@ -66,7 +67,7 @@
         </div>
     </div>
 
-    <!-- Исправлено: Ровно 4 колонки в заголовке детализации -->
+    <!-- Восстановлено: Детализация ровно на 4 колонки в шапке -->
     <div class="card" style="overflow-x: auto;">
         <h2>📊 Детализация всех расходов</h2>
         <table>
@@ -82,7 +83,7 @@
         </table>
     </div>
 
-    <!-- Модуль отчета за произвольный период -->
+    <!-- Модуль: Отчёт расходов за период -->
     <div class="card" id="report-section">
         <h2>📅 Отчёт расходов за период</h2>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 15px;">
@@ -96,14 +97,15 @@
     <div class="card">
         <h2>💳 Ваши карты и лимиты</h2>
         <div id="cards-manage-list"></div>
-        <h3 style="margin-top:15px;">Добавить новую карту</h3>
+        <hr style="border:none; border-top:1px solid #eee; margin:15px 0;">
+        <h3>Добавить новую карту в систему</h3>
         <div style="display:flex; flex-direction:column; gap:10px;">
-            <input type="text" id="card-name" placeholder="Название карты" style="padding:8px; border-radius:6px;">
-            <input type="number" id="card-limit" placeholder="Лимит (₽)" style="padding:8px; border-radius:6px;">
-            <input type="number" id="card-grace" placeholder="Грейс (дней)" style="padding:8px; border-radius:6px;">
+            <input type="text" id="card-name" placeholder="Название банка / карты" style="padding:8px; border-radius:6px;">
+            <input type="number" id="card-limit" placeholder="Кредитный лимит карты (₽)" style="padding:8px; border-radius:6px;">
+            <input type="number" id="card-grace" placeholder="Срок грейс-периода (дней)" style="padding:8px; border-radius:6px;">
             <select id="card-type" style="padding:8px; border-radius:6px;">
-                <option value="purchase">От даты покупки</option>
-                <option value="month">С 1-го числа месяца</option>
+                <option value="purchase">От даты покупки (ВТБ, Альфа, Т-Банк)</option>
+                <option value="month">С 1-го числа месяца покупки (Сбербанк)</option>
             </select>
             <button onclick="addCard()" style="padding:10px; background:var(--success); color:#fff; border:none; border-radius:6px; font-weight:bold;">Создать карту</button>
         </div>
