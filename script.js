@@ -1,4 +1,4 @@
-// Инициализация данных из локального хранилища
+// Инициализация локальных данных
 var cards = JSON.parse(localStorage.getItem('cards')) || [];
 var transactions = JSON.parse(localStorage.getItem('transactions')) || [];
 
@@ -16,23 +16,21 @@ if (document.getElementById('report-end')) {
     document.getElementById('report-end').valueAsDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 }
 
-// Функция сохранения данных и полной перерисовки интерфейса
 function saveData() {
     localStorage.setItem('cards', JSON.stringify(cards));
     localStorage.setItem('transactions', JSON.stringify(transactions));
     renderAll();
 }
 
-// Безопасное форматирование даты из ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
+// БЕЗОПАСНОЕ ИСПРАВЛЕНИЕ: Парсинг и форматирование даты без падения типов
 function cleanFormatDate(dateStr) {
     if (!dateStr) return '-';
-    var cleanStr = dateStr.split('T')[0];
+    var cleanStr = String(dateStr).split('T')[0];
     var arr = cleanStr.split('-');
     if (arr.length !== 3) return dateStr;
     return [arr[2], arr[1], arr[0]].join('.');
 }
 
-// Добавление новой карты
 function addCard() {
     var nameInput = document.getElementById('card-name');
     var limitInput = document.getElementById('card-limit');
@@ -55,7 +53,6 @@ function addCard() {
     saveData();
 }
 
-// Удаление карты и связанных трат
 function deleteCard(id) {
     if (confirm('Удалить карту? Все расходы по ней также будут удалены.')) {
         cards = cards.filter(function(c) { return c.id !== id; });
@@ -64,8 +61,8 @@ function deleteCard(id) {
     }
 }
 
-// Расчет критической даты окончания грейс-периода
 function calculateGraceDeadline(dateStr, graceDays, cardType) {
+    if (!dateStr) return '';
     var parts = dateStr.split('-');
     var year = parseInt(parts[0]);
     var month = parseInt(parts[1]) - 1;
@@ -82,8 +79,8 @@ function calculateGraceDeadline(dateStr, graceDays, cardType) {
     return baseDate.toISOString().split('T')[0];
 }
 
-// Расчет даты минимального платежа (до 30-го числа)
 function calculateMinPaymentDate(purchaseDateStr) {
+    if (!purchaseDateStr) return '';
     var parts = purchaseDateStr.split('-');
     var year = parseInt(parts[0]);
     var month = parseInt(parts[1]) - 1; 
@@ -106,7 +103,7 @@ function calculateMinPaymentDate(purchaseDateStr) {
     var monthFormatted = String(targetMonth + 1).padStart(2, '0');
     return [targetYear, monthFormatted, '30'].join('-');
 }
-// Добавление новой транзакции
+
 function addTransaction() {
     var cardId = document.getElementById('tx-card').value;
     var amount = parseFloat(document.getElementById('tx-amount').value);
@@ -132,7 +129,6 @@ function addTransaction() {
     saveData();
 }
 
-// Редактирование существующей транзакции
 function editTransaction(id) {
     var tx = transactions.find(function(t) { return t.id === id; });
     if (!tx) return;
@@ -159,7 +155,6 @@ function editTransaction(id) {
     saveData();
 }
 
-// Удаление транзакции
 function deleteTransaction(id) {
     if (confirm('Удалить эту запись о расходе?')) {
         transactions = transactions.filter(function(t) { return t.id !== id; });
@@ -167,7 +162,6 @@ function deleteTransaction(id) {
     }
 }
 
-// Модуль формирования отчета по картам за период
 function generateReport() {
     var startVal = document.getElementById('report-start').value;
     var endVal = document.getElementById('report-end').value;
@@ -232,7 +226,6 @@ function generateReport() {
     
     resultDiv.innerHTML = html.join('');
 }
-// Функция глобального обновления DOM на основе актуальных массивов данных
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
@@ -346,5 +339,4 @@ function renderAll() {
     }
 }
 
-// Стартовый рендеринг при загрузке
 renderAll();
