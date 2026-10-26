@@ -1,3 +1,4 @@
+// Инициализация базы данных
 var cards = JSON.parse(localStorage.getItem('cards')) || [];
 var transactions = JSON.parse(localStorage.getItem('transactions')) || [];
 
@@ -5,6 +6,7 @@ if (document.getElementById('tx-date')) {
     document.getElementById('tx-date').valueAsDate = new Date();
 }
 
+// Автоподстановка дат для отчета (начало и конец месяца)
 var now = new Date();
 if (document.getElementById('report-start')) {
     document.getElementById('report-start').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -19,10 +21,10 @@ function saveData() {
     renderAll();
 }
 
-// НАЙДЕНО И ИСПРАВЛЕНО: Безопасное форматирование даты из ГГГГ-ММ-ДД в ДД.ММ.ГГГГ
+// ЭТАЛОННОЕ ИСПРАВЛЕНИЕ: Безопасный строковый парсинг даты
 function cleanFormatDate(dateStr) {
     if (!dateStr) return '-';
-    var cleanStr = dateStr.split('T')[0];
+    var cleanStr = String(dateStr).split('T')[0];
     var arr = cleanStr.split('-');
     if (arr.length !== 3) return dateStr;
     return [arr[2], arr[1], arr[0]].join('.');
@@ -57,8 +59,7 @@ function calculateMinPaymentDate(purchaseDateStr) {
         var isLeap = (targetYear % 4 === 0 && targetYear % 100 !== 0) || (targetYear % 400 === 0);
         return [targetYear, '02', isLeap ? '29' : '28'].join('-');
     }
-    var monthFormatted = String(targetMonth + 1).padStart(2, '0');
-    return [targetYear, monthFormatted, '30'].join('-');
+    return [targetYear, String(targetMonth + 1).padStart(2, '0'), '30'].join('-');
 }
 
 function addCard() {
@@ -66,7 +67,7 @@ function addCard() {
     var limit = document.getElementById('card-limit').value;
     var grace = document.getElementById('card-grace').value;
     var type = document.getElementById('card-type').value;
-    if (!name || !limit || !grace) return alert('Заполните поля');
+    if (!name || !limit || !grace) return alert('Заполните все поля');
     cards.push({ id: Date.now().toString(), name: name, limit: parseFloat(limit), graceDays: parseInt(grace), type: type });
     document.getElementById('card-name').value = '';
     document.getElementById('card-limit').value = '';
@@ -75,7 +76,7 @@ function addCard() {
 }
 
 function deleteCard(id) {
-    if (confirm('Удалить карту?')) {
+    if (confirm('Удалить карту и её расходы?')) {
         cards = cards.filter(function(c) { return c.id !== id; });
         transactions = transactions.filter(function(t) { return t.cardId !== id; });
         saveData();
@@ -86,7 +87,7 @@ function addTransaction() {
     var cardId = document.getElementById('tx-card').value;
     var amount = parseFloat(document.getElementById('tx-amount').value);
     var dateValue = document.getElementById('tx-date').value;
-    if (!cardId || isNaN(amount) || !dateValue) return alert('Заполните данные');
+    if (!cardId || isNaN(amount) || !dateValue) return alert('Укажите корректные данные');
     var card = cards.find(function(c) { return c.id === cardId; });
     transactions.push({
         id: Date.now().toString(), cardId: cardId, cardName: card.name, amount: amount, date: dateValue,
@@ -100,10 +101,10 @@ function addTransaction() {
 function editTransaction(id) {
     var tx = transactions.find(function(t) { return t.id === id; });
     if (!tx) return;
-    var newAmount = prompt('Сумма:', tx.amount);
+    var newAmount = prompt('Новая сумма:', tx.amount);
     if (newAmount === null) return;
-    var newDate = prompt('Дата (ГГГГ-ММ-ДД):', tx.date);
-    if (newDate === null || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Ошибка');
+    var newDate = prompt('Новая дата (ГГГГ-ММ-ДД):', tx.date);
+    if (newDate === null || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Неверный формат');
     var card = cards.find(function(c) { return c.id === tx.cardId; });
     tx.amount = parseFloat(newAmount);
     tx.date = newDate;
@@ -119,26 +120,26 @@ function deleteTransaction(id) {
         saveData();
     }
 }
-
 function generateReport() {
     var sVal = document.getElementById('report-start').value;
     var eVal = document.getElementById('report-end').value;
     var resultDiv = document.getElementById('report-result');
-    if (!sVal || !eVal) return alert('Выберите даты');
+    if (!sVal || !eVal) return alert('Укажите даты периода');
     var startDate = new Date(sVal); var endDate = new Date(eVal); endDate.setHours(23,59,59,999);
     var filtered = transactions.filter(function(t) { var d = new Date(t.date); return d >= startDate && d <= endDate; });
-    if (filtered.length === 0) { resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:15px;">Трат нет.</p>'; return; }
+    if (filtered.length === 0) { resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:15px;">За данный период трат нет.</p>'; return; }
     var rData = {};
     filtered.forEach(function(t) {
         if (!rData[t.cardId]) rData[t.cardId] = { name: t.cardName, total: 0, count: 0 };
         rData[t.cardId].total += t.amount; rData[t.cardId].count++;
     });
     var total = filtered.reduce(function(s, t) { return s + t.amount; }, 0);
-    var html = ['<div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;"><h4>Сводный отчет</h4><table><thead><tr><th>Карта</th><th>Трат</th><th style="text-align:right;">Сумма</th></tr></thead><tbody>'];
+    var html = ['<div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;"><h4>Сводный отчет по картам</h4><table><thead><tr><th>Карта</th><th>Кол-во трат</th><th style="text-align:right;">Сумма трат</th></tr></thead><tbody>'];
     for (var cid in rData) { html.push('<tr><td>' + rData[cid].name + '</td><td>' + rData[cid].count + '</td><td style="text-align:right;">' + rData[cid].total.toLocaleString('ru-RU') + ' ₽</td></tr>'); }
-    html.push('<tr style="font-weight:bold;"><td>ИТОГО:</td><td>' + filtered.length + '</td><td style="text-align:right;">' + total.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
+    html.push('<tr style="font-weight:bold; background:rgba(0,0,0,0.02);"><td>ИТОГО:</td><td>' + filtered.length + '</td><td style="text-align:right; color:var(--danger);">' + total.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
     resultDiv.innerHTML = html.join('');
 }
+
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
@@ -175,21 +176,21 @@ function renderAll() {
             .filter(function(item) { return item.stats && item.stats.totalSpent > 0; })
             .sort(function(a, b) { return new Date(a.stats.earliestDeadline) - new Date(b.stats.earliestDeadline); });
 
-        timelineList.innerHTML = activeCards.length === 0 ? '<p style="color:var(--text-muted); font-size:0.9rem;">Нет активных задолженностей.</p>' : activeCards.map(function(item) {
+        timelineList.innerHTML = activeCards.length === 0 ? '<p style="color:var(--text-muted); font-size:0.9rem;">Нет активных задолженностей по картам.</p>' : activeCards.map(function(item) {
             var c = item.card; var s = item.stats;
             var diffDays = Math.ceil((new Date(s.earliestDeadline) - today) / (1000 * 60 * 60 * 24));
             var statusClass = diffDays <= 7 ? 'status-danger' : (diffDays <= 30 ? 'status-warning' : '');
             var diffClass = diffDays <= 7 ? 'danger-text' : (diffDays <= 30 ? 'warning-text' : 'success-text');
-            return ['<div class="card payment-item ', statusClass, '"><div class="payment-info"><h4>', c.name, '</h4><p>🔹 Мин. платеж: <strong>', s.totalMinPay.toLocaleString('ru-RU'), ' ₽</strong> до ', cleanFormatDate(s.minPayDeadline), '<br>💳 Доступно: <strong>', (c.limit - s.totalSpent).toLocaleString('ru-RU'), ' ₽</strong> из ', c.limit.toLocaleString(), '</p></div><div class="payment-amount">', s.totalSpent.toLocaleString('ru-RU'), ' ₽<span class="days-left ', diffClass, '">Грейс до ', cleanFormatDate(s.earliestDeadline), ' (Ост. дней: ', diffDays, ')</span></div></div>'].join('');
+            return ['<div class="card payment-item ', statusClass, '"><div class="payment-info"><h4>', c.name, '</h4><p>🔹 Обязательный мин. платеж: <strong>', s.totalMinPay.toLocaleString('ru-RU'), ' ₽</strong> до ', cleanFormatDate(s.minPayDeadline), '<br>💳 Остаток лимита: <strong>', (c.limit - s.totalSpent).toLocaleString('ru-RU'), ' ₽</strong> из ', c.limit.toLocaleString(), '</p></div><div class="payment-amount">', s.totalSpent.toLocaleString('ru-RU'), ' ₽<span class="days-left ', diffClass, '">Полный грейс до ', cleanFormatDate(s.earliestDeadline), ' (Ост. дней: ', diffDays, ')</span></div></div>'].join('');
         }).join('');
     }
 
     var tableBody = document.getElementById('transactions-table-body');
     if (tableBody) {
         var sortedTxs = [...transactions].sort(function(a, b) { return new Date(a.deadline) - new Date(b.deadline); });
-        tableBody.innerHTML = transactions.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Трат нет</td></tr>' : sortedTxs.map(function(t) {
+        tableBody.innerHTML = transactions.length === 0 ? '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>' : sortedTxs.map(function(t) {
             var rangeStr = Math.round(t.amount * 0.02).toLocaleString('ru-RU') + '–' + Math.round(t.amount * 0.05).toLocaleString('ru-RU') + ' ₽';
-            return ['<tr><td><strong>', t.cardName, '</strong><br><small style="color:var(--text-muted);">от ', cleanFormatDate(t.date), '</small></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', rangeStr, '<br><small style="color:var(--text-muted);">до ', cleanFormatDate(t.minPaymentDeadline), '</small></td><td class="td-actions"><button class="btn-action edit-icon" onclick="editTransaction(\'', t.id, '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="btn-action delete-icon" onclick="deleteTransaction(\'', t.id, '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td></tr>'].join('');
+            return ['<tr><td><strong>', t.cardName, '</strong><br><small style="color:var(--text-muted);">от ', cleanFormatDate(t.date), '</small></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', rangeStr, '<br><small style="color:var(--text-muted);">до ', cleanFormatDate(t.minPaymentDeadline), '</small></td><td class="td-actions"><button class="btn-action edit-icon" title="Изменить" onclick="editTransaction(\'', t.id, '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="btn-action delete-icon" title="Удалить" onclick="deleteTransaction(\'', t.id, '\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button></td></tr>'].join('');
         }).join('');
     }
 }
