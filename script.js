@@ -5,66 +5,10 @@ if (document.getElementById('tx-date')) {
     document.getElementById('tx-date').valueAsDate = new Date();
 }
 
-var now = new Date();
-if (document.getElementById('report-start')) {
-    document.getElementById('report-start').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
-}
-if (document.getElementById('report-end')) {
-    document.getElementById('report-end').valueAsDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-}
-
 function saveData() {
     localStorage.setItem('cards', JSON.stringify(cards));
     localStorage.setItem('transactions', JSON.stringify(transactions));
     renderAll();
-}
-
-// ИСПРАВЛЕНО И ВОССТАНОВЛЕНО: Оригинальный безопасный парсинг даты
-function cleanFormatDate(dateStr) {
-    if (!dateStr) return '-';
-    var cleanStr = String(dateStr).split('T')[0];
-    var arr = cleanStr.split('-');
-    if (arr.length !== 3) return dateStr;
-    return [arr[2], arr[1], arr[0]].join('.');
-}
-
-function calculateGraceDeadline(dateStr, graceDays, cardType) {
-    var parts = dateStr.split('-');
-    var year = parseInt(parts[0]);
-    var month = parseInt(parts[1]) - 1;
-    var day = parseInt(parts[2]);
-
-    var baseDate;
-    if (cardType === 'month') {
-        baseDate = new Date(year, month, 1, 12, 0, 0);
-    } else {
-        baseDate = new Date(year, month, day, 12, 0, 0);
-    }
-    baseDate.setDate(baseDate.getDate() + graceDays - 1);
-    return baseDate.toISOString().split('T')[0];
-}
-function calculateMinPaymentDate(purchaseDateStr) {
-    var parts = purchaseDateStr.split('-');
-    var year = parseInt(parts[0]);
-    var month = parseInt(parts[1]) - 1; 
-    var day = parseInt(parts[2]);
-
-    var targetYear = year;
-    var targetMonth = month;
-    
-    if (day >= 30) {
-        targetMonth += 1;
-        if (targetMonth > 11) { targetMonth = 0; targetYear += 1; }
-    }
-    
-    if (targetMonth === 1) {
-        var isLeap = (targetYear % 4 === 0 && targetYear % 100 !== 0) || (targetYear % 400 === 0);
-        var febDay = isLeap ? '29' : '28';
-        return [targetYear, '02', febDay].join('-');
-    }
-    
-    var monthFormatted = String(targetMonth + 1).padStart(2, '0');
-    return [targetYear, monthFormatted, '30'].join('-');
 }
 
 function addCard() {
@@ -95,6 +39,46 @@ function deleteCard(id) {
         transactions = transactions.filter(function(t) { return t.cardId !== id; });
         saveData();
     }
+}
+function calculateGraceDeadline(dateStr, graceDays, cardType) {
+    var parts = dateStr.split('-');
+    var year = parseInt(parts[0]);
+    var month = parseInt(parts[1]) - 1;
+    var day = parseInt(parts[2]);
+
+    var baseDate;
+    if (cardType === 'month') {
+        baseDate = new Date(year, month, 1, 12, 0, 0);
+        baseDate.setDate(baseDate.getDate() + graceDays - 1);
+    } else {
+        baseDate = new Date(year, month, day, 12, 0, 0);
+        baseDate.setDate(baseDate.getDate() + graceDays - 1);
+    }
+    return baseDate.toISOString().split('T')[0];
+}
+
+function calculateMinPaymentDate(purchaseDateStr) {
+    var parts = purchaseDateStr.split('-');
+    var year = parseInt(parts[0]);
+    var month = parseInt(parts[1]) - 1; 
+    var day = parseInt(parts[2]);
+
+    var targetYear = year;
+    var targetMonth = month;
+    
+    if (day >= 30) {
+        targetMonth += 1;
+        if (targetMonth > 11) { targetMonth = 0; targetYear += 1; }
+    }
+    
+    if (targetMonth === 1) {
+        var isLeap = (targetYear % 4 === 0 && targetYear % 100 !== 0) || (targetYear % 400 === 0);
+        var febDay = isLeap ? '29' : '28';
+        return [targetYear, '02', febDay].join('-');
+    }
+    
+    var monthFormatted = String(targetMonth + 1).padStart(2, '0');
+    return [targetYear, monthFormatted, '30'].join('-');
 }
 
 function addTransaction() {
@@ -136,10 +120,12 @@ function editTransaction(id) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Неверный формат даты');
 
     var card = cards.find(function(c) { return c.id === tx.cardId; });
+    var cardType = card ? card.type : 'purchase';
+    var cardGrace = card ? card.graceDays : 120;
 
     tx.amount = parsedAmount;
     tx.date = newDate;
-    tx.deadline = calculateGraceDeadline(newDate, card.graceDays, card.type);
+    tx.deadline = calculateGraceDeadline(newDate, cardGrace, cardType);
     tx.minPaymentAmount = Math.round(parsedAmount * 0.035);
     tx.minPaymentDeadline = calculateMinPaymentDate(newDate);
 
@@ -152,58 +138,14 @@ function deleteTransaction(id) {
         saveData();
     }
 }
-
-function generateReport() {
-    var startVal = document.getElementById('report-start').value;
-    var endVal = document.getElementById('report-end').value;
-    var resultDiv = document.getElementById('report-result');
-    
-    if (!startVal || !endVal) return alert('Выберите начальную и конечную дату периода');
-    
-    var startDate = new Date(startVal);
-    var endDate = new Date(endVal);
-    endDate.setHours(23, 59, 59, 999);
-    
-    var filteredTxs = transactions.filter(function(t) {
-        var txDate = new Date(t.date);
-        return txDate >= startDate && txDate <= endDate;
-    });
-    
-    if (filteredTxs.length === 0) {
-        resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:15px;">За выбранный период трат не найдено.</p>';
-        return;
-    }
-    
-    var reportData = {};
-    filteredTxs.forEach(function(t) {
-        if (!reportData[t.cardId]) {
-            reportData[t.cardId] = { cardName: t.cardName, total: 0, itemsCount: 0 };
-        }
-        reportData[t.cardId].total += t.amount;
-        reportData[t.cardId].itemsCount += 1;
-    });
-    
-    var totalPeriodSpent = filteredTxs.reduce(function(sum, t) { return sum + t.amount; }, 0);
-    
-    var html = [
-        '<div style="margin-top:20px; border-top:1px dashed #ccc; padding-top:15px;">',
-        '<h4>Результат отчета с ', cleanFormatDate(startVal), ' по ', cleanFormatDate(endVal), '</h4>',
-        '<table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:0.9rem;">',
-        '<thead><tr style="border-bottom:2px solid #ccc; text-align:left;">',
-        '<th style="padding:6px;">Название карты</th>',
-        '<th style="padding:6px; text-align:center;">Кол-во трат</th>',
-        '<th style="padding:6px; text-align:right;">Сумма трат</th>',
-        '</tr></thead><tbody>'
-    ];
-    
-    for (var cardId in reportData) {
-        var r = reportData[cardId];
-        html.push('<tr><td style="padding:6px;"><strong>' + r.cardName + '</strong></td><td style="padding:6px; text-align:center;">' + r.itemsCount + '</td><td style="padding:6px; text-align:right;">' + r.total.toLocaleString('ru-RU') + ' ₽</td></tr>');
-    }
-    
-    html.push('<tr style="font-weight:bold; background:rgba(0,0,0,0.05);"><td style="padding:6px;">ИТОГО ЗА ПЕРИОД:</td><td style="padding:6px; text-align:center;">' + filteredTxs.length + '</td><td style="padding:6px; text-align:right; color:#e74c3c;">' + totalPeriodSpent.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
-    resultDiv.innerHTML = html.join('');
+function cleanFormatDate(dateStr) {
+    if (!dateStr) return '-';
+    var cleanStr = dateStr.split('T')[0];
+    var arr = cleanStr.split('-');
+    if (arr.length !== 3) return dateStr;
+    return [arr[2], arr[1], arr[0]].join('.');
 }
+
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
@@ -290,28 +232,10 @@ function renderAll() {
         var sortedTxs = [...transactions].sort(function(a, b) { return new Date(a.deadline) - new Date(b.deadline); });
         
         if (transactions.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
         } else {
             tableBody.innerHTML = sortedTxs.map(function(t) {
-                var minRange = Math.round(t.amount * 0.02);
-                var maxRange = Math.round(t.amount * 0.05);
-                var rangeStr = minRange.toLocaleString('ru-RU') + '–' + maxRange.toLocaleString('ru-RU') + ' ₽';
-
-                return [
-                    '<tr>',
-                        '<td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td>',
-                        '<td>', t.amount.toLocaleString('ru-RU'), ' ₽</td>',
-                        '<td>', rangeStr, '<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td>',
-                        '<td class="td-actions">',
-                            '<button class="btn-action edit-icon" title="Изменить" onclick="editTransaction(\'', t.id, '\')">',
-                                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>',
-                            '</button>',
-                            '<button class="btn-action delete-icon" title="Удалить" onclick="deleteTransaction(\'', t.id, '\')">',
-                                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>',
-                            '</button>',
-                        '</td>',
-                    '</tr>'
-                ].join('');
+                return ['<tr><td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', t.minPaymentAmount.toLocaleString('ru-RU'), ' ₽<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td><td>', cleanFormatDate(t.deadline), '</td><td class="td-actions"><button class="btn-action edit" onclick="editTransaction(\'', t.id, '\')">Изменить</button><button class="btn-action delete" onclick="deleteTransaction(\'', t.id, '\')">Удалить</button></td></tr>'].join('');
             }).join('');
         }
     }
