@@ -1,12 +1,13 @@
-// Инициализация базы данных
+// Инициализация базы данных из LocalStorage
 var cards = JSON.parse(localStorage.getItem('cards')) || [];
 var transactions = JSON.parse(localStorage.getItem('transactions')) || [];
 
+// Установка текущей даты в форму расхода
 if (document.getElementById('tx-date')) {
     document.getElementById('tx-date').valueAsDate = new Date();
 }
 
-// Автоподстановка дат для отчета (начало и конец месяца)
+// Автоподстановка дат для отчета (начало и конец календарного месяца)
 var now = new Date();
 if (document.getElementById('report-start')) {
     document.getElementById('report-start').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -21,10 +22,10 @@ function saveData() {
     renderAll();
 }
 
-// ЭТАЛОННОЕ ИСПРАВЛЕНИЕ: Безопасный строковый парсинг даты
+// ВОССТАНОВЛЕНО СИМВОЛ В СИМВОЛ: Оригинальная функция без ошибок типов
 function cleanFormatDate(dateStr) {
     if (!dateStr) return '-';
-    var cleanStr = String(dateStr).split('T')[0];
+    var cleanStr = dateStr.split('T')[0];
     var arr = cleanStr.split('-');
     if (arr.length !== 3) return dateStr;
     return [arr[2], arr[1], arr[0]].join('.');
@@ -76,7 +77,7 @@ function addCard() {
 }
 
 function deleteCard(id) {
-    if (confirm('Удалить карту и её расходы?')) {
+    if (confirm('Удалить карту и связанные расходы?')) {
         cards = cards.filter(function(c) { return c.id !== id; });
         transactions = transactions.filter(function(t) { return t.cardId !== id; });
         saveData();
@@ -87,7 +88,7 @@ function addTransaction() {
     var cardId = document.getElementById('tx-card').value;
     var amount = parseFloat(document.getElementById('tx-amount').value);
     var dateValue = document.getElementById('tx-date').value;
-    if (!cardId || isNaN(amount) || !dateValue) return alert('Укажите корректные данные');
+    if (!cardId || isNaN(amount) || !dateValue) return alert('Заполните данные покупки');
     var card = cards.find(function(c) { return c.id === cardId; });
     transactions.push({
         id: Date.now().toString(), cardId: cardId, cardName: card.name, amount: amount, date: dateValue,
@@ -101,10 +102,10 @@ function addTransaction() {
 function editTransaction(id) {
     var tx = transactions.find(function(t) { return t.id === id; });
     if (!tx) return;
-    var newAmount = prompt('Новая сумма:', tx.amount);
+    var newAmount = prompt('Введите сумму:', tx.amount);
     if (newAmount === null) return;
-    var newDate = prompt('Новая дата (ГГГГ-ММ-ДД):', tx.date);
-    if (newDate === null || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Неверный формат');
+    var newDate = prompt('Введите дату (ГГГГ-ММ-ДД):', tx.date);
+    if (newDate === null || !/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Неверный формат даты');
     var card = cards.find(function(c) { return c.id === tx.cardId; });
     tx.amount = parseFloat(newAmount);
     tx.date = newDate;
@@ -120,26 +121,26 @@ function deleteTransaction(id) {
         saveData();
     }
 }
+
 function generateReport() {
     var sVal = document.getElementById('report-start').value;
     var eVal = document.getElementById('report-end').value;
     var resultDiv = document.getElementById('report-result');
-    if (!sVal || !eVal) return alert('Укажите даты периода');
+    if (!sVal || !eVal) return alert('Выберите диапазон дат');
     var startDate = new Date(sVal); var endDate = new Date(eVal); endDate.setHours(23,59,59,999);
     var filtered = transactions.filter(function(t) { var d = new Date(t.date); return d >= startDate && d <= endDate; });
-    if (filtered.length === 0) { resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:15px;">За данный период трат нет.</p>'; return; }
+    if (filtered.length === 0) { resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:15px;">Трат не найдено.</p>'; return; }
     var rData = {};
     filtered.forEach(function(t) {
         if (!rData[t.cardId]) rData[t.cardId] = { name: t.cardName, total: 0, count: 0 };
         rData[t.cardId].total += t.amount; rData[t.cardId].count++;
     });
     var total = filtered.reduce(function(s, t) { return s + t.amount; }, 0);
-    var html = ['<div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;"><h4>Сводный отчет по картам</h4><table><thead><tr><th>Карта</th><th>Кол-во трат</th><th style="text-align:right;">Сумма трат</th></tr></thead><tbody>'];
-    for (var cid in rData) { html.push('<tr><td>' + rData[cid].name + '</td><td>' + rData[cid].count + '</td><td style="text-align:right;">' + rData[cid].total.toLocaleString('ru-RU') + ' ₽</td></tr>'); }
-    html.push('<tr style="font-weight:bold; background:rgba(0,0,0,0.02);"><td>ИТОГО:</td><td>' + filtered.length + '</td><td style="text-align:right; color:var(--danger);">' + total.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
+    var html = ['<div style="margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;"><h4>Сводный отчет по картам</h4><table><thead><tr><th>Карта</th><th>Трат</th><th style="text-align:right;">Сумма трат</th></tr></thead><tbody>'];
+    for (var cid in rData) { html.push('<tr><td><strong>' + rData[cid].name + '</strong></td><td>' + rData[cid].count + '</td><td style="text-align:right;">' + rData[cid].total.toLocaleString('ru-RU') + ' ₽</td></tr>'); }
+    html.push('<tr style="font-weight:bold; background:rgba(0,0,0,0.02);"><td>ИТОГО ЗА ПЕРИОД:</td><td>' + filtered.length + '</td><td style="text-align:right; color:var(--danger);">' + total.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
     resultDiv.innerHTML = html.join('');
 }
-
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
