@@ -105,6 +105,7 @@ function addTransaction() {
     document.getElementById('tx-amount').value = '';
     saveData();
 }
+
 function editTransaction(id) {
     var tx = transactions.find(function(t) { return t.id === id; });
     if (!tx) return;
@@ -137,12 +138,11 @@ function deleteTransaction(id) {
         saveData();
     }
 }
-
-function cleanFormatDate(isoString) {
-    if (!isoString) return '-';
-    var cleanStr = isoString.split('T')[0];
+function cleanFormatDate(dateStr) {
+    if (!dateStr) return '-';
+    var cleanStr = dateStr.split('T')[0];
     var arr = cleanStr.split('-');
-    if (arr.length !== 3) return isoString;
+    if (arr.length !== 3) return dateStr;
     return [arr[2], arr[1], arr[0]].join('.');
 }
 
@@ -235,7 +235,7 @@ function renderAll() {
             tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
         } else {
             tableBody.innerHTML = sortedTxs.map(function(t) {
-                return ['<tr><td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', t.minPaymentAmount.toLocaleString('ru-RU'), ' ₽<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td><td>', cleanFormatDate(t.deadline), '</td><td class="td-actions"><button class="btn-action edit" onclick="editTransaction(\'', t.id, '\')">Изменить</button><button class="btn-action delete" onclick="deleteTransaction(\'' + t.id + '\')">Удалить</button></td></tr>'].join('');
+                return ['<tr><td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', t.minPaymentAmount.toLocaleString('ru-RU'), ' ₽<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td><td>', cleanFormatDate(t.deadline), '</td><td class="td-actions"><button class="btn-action edit" onclick="editTransaction(\'', t.id, '\')">Изменить</button><button class="btn-action delete" onclick="deleteTransaction(\'', t.id, '\')">Удалить</button></td></tr>'].join('');
             }).join('');
         }
     }
