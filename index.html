@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>whentopay tracking</title>
     
-    <!-- Вшитый Favicon на основе вашей картинки (банковская карта) -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><rect width=%2290%22 height=%2264%22 x=%225%22 y=%2218%22 rx=%2212%22 fill=%22%23f2a134%22/><rect width=%2290%22 height=%2214%22 x=%225%22 y=%2230%22 fill=%22%232c303b%22/><rect width=%2270%22 height=%2214%22 x=%2215%22 y=%2254%22 rx=%222%22 fill=%22%23f0f4f8%22/><path d=%22M20 61 Q 30 56, 40 61 T 60 61 T 80 61%22 fill=%22none%22 stroke=%22%237a8b99%22 stroke-width=%224%22 stroke-linecap=%22round%22/></svg>">
+    <!-- Универсальный Favicon, работающий на всех смартфонах и ПК -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>👛</text></svg>">
     
     <style>
         :root {
@@ -22,7 +22,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { background-color: var(--bg-color); color: var(--text-color); padding: 16px; padding-bottom: 80px; }
         h2 { margin-bottom: 16px; font-weight: 600; font-size: 1.2rem; }
-        .container { max-width: 600px; margin: 0 auto; }
+        .container { max-width: 650px; margin: 0 auto; }
         
         .summary-card { background: linear-gradient(135deg, #1f2029 0%, #2a2b36 100%); padding: 20px; border-radius: 16px; border: 1px solid #323238; margin-bottom: 24px; text-align: center; }
         .summary-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 6px; }
@@ -31,13 +31,14 @@
         .section { margin-bottom: 24px; }
         .card { background-color: var(--card-bg); border-radius: 12px; padding: 16px; margin-bottom: 10px; border: 1px solid #29292e; }
         
+        /* Сводная карточка карты в таймлайне */
         .payment-item { display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent); padding-left: 12px; }
         .payment-item.status-danger { border-left-color: var(--danger); }
         .payment-item.status-warning { border-left-color: var(--warning); }
-        .payment-info h4 { font-size: 1rem; margin-bottom: 2px; }
-        .payment-info p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.3; }
-        .payment-amount { text-align: right; font-weight: bold; font-size: 1.1rem; }
-        .days-left { font-size: 0.75rem; display: block; font-weight: normal; margin-top: 4px; }
+        .payment-info h4 { font-size: 1.1rem; margin-bottom: 4px; color: #fff; }
+        .payment-info p { font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; }
+        .payment-amount { text-align: right; font-weight: bold; font-size: 1.2rem; }
+        .days-left { font-size: 0.8rem; display: block; font-weight: normal; margin-top: 6px; }
 
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 4px; }
@@ -45,18 +46,22 @@
         input:focus, select:focus { border-color: var(--accent); }
         button.btn { background-color: var(--accent); color: #000; font-weight: bold; border: none; cursor: pointer; margin-top: 5px; }
         
-        .btn-action { background-color: transparent; border: 1px solid var(--text-muted); color: var(--text-color); padding: 4px 8px; width: auto; font-size: 0.75rem; border-radius: 4px; cursor: pointer; margin-left: 4px; }
+        /* Полноценные кнопки действий */
+        .btn-action { background-color: transparent; border: 1px solid var(--text-muted); color: var(--text-color); padding: 6px 10px; width: auto; font-size: 0.8rem; border-radius: 6px; cursor: pointer; margin-left: 6px; font-weight: 500; transition: all 0.2s; }
         .btn-action.edit { border-color: var(--warning); color: var(--warning); }
+        .btn-action.edit:hover { background-color: rgba(247, 183, 49, 0.1); }
         .btn-action.delete { border-color: var(--danger); color: var(--danger); }
+        .btn-action.delete:hover { background-color: rgba(247, 37, 133, 0.1); }
+        
         .btn-danger-card { background-color: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 6px 12px; width: auto; font-size: 0.8rem; border-radius: 6px; cursor: pointer; }
 
         .card-manage-item { display: flex; justify-content: space-between; align-items: center; }
         
         .table-container { overflow-x: auto; background-color: var(--card-bg); border-radius: 12px; border: 1px solid #29292e; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; min-width: 550px; }
-        th, td { padding: 10px 12px; border-bottom: 1px solid #29292e; vertical-align: middle; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; min-width: 600px; }
+        th, td { padding: 12px; border-bottom: 1px solid #29292e; vertical-align: middle; }
         th { color: var(--text-muted); font-weight: 500; background-color: #151518; }
-        .td-actions { text-align: right; min-width: 110px; }
+        .td-actions { text-align: right; min-width: 170px; }
 
         .danger-text { color: var(--danger); }
         .warning-text { color: var(--warning); }
@@ -65,16 +70,19 @@
 </head>
 <body>
     <div class="container">
+        <!-- Главный экран: Общий долг -->
         <div class="summary-card">
             <p>Общий долг по всем картам</p>
             <h1 id="total-debt">0 ₽</h1>
         </div>
 
+        <!-- Секция 1: Сводный таймлайн по КАРТАМ -->
         <div class="section">
             <h2>📅 Ближайшие даты и суммы платежей до уплаты процентов</h2>
             <div id="timeline-list"></div>
         </div>
 
+        <!-- Секция 2: Запись нового расхода -->
         <div class="section card">
             <h2>➕ Записать новый расход по карте</h2>
             <div class="form-group">
@@ -92,6 +100,7 @@
             <button class="btn" onclick="addTransaction()">Зафиксировать расход</button>
         </div>
 
+        <!-- Секция 3: Детализация всех расходов -->
         <div class="section">
             <h2>📊 Детализация всех расходов</h2>
             <div class="table-container">
@@ -110,6 +119,7 @@
             </div>
         </div>
 
+        <!-- Секция 4: Управление картами -->
         <div class="section card">
             <h2>💳 Ваши карты и лимиты</h2>
             <div id="cards-manage-list" style="margin-bottom: 15px;"></div>
@@ -117,7 +127,11 @@
             <h3 style="font-size: 0.95rem; margin-bottom: 10px; color: var(--text-muted);">Добавить новую карту в систему</h3>
             <div class="form-group">
                 <label>Название банка / карты</label>
-                <input type="text" id="card-name" placeholder="Например, Сбер 120 или Альфа">
+                <input type="text" id="card-name" placeholder="Например, Сбер 120 или ВТБ">
+            </div>
+            <div class="form-group">
+                <label>Кредитный лимит карты (₽)</label>
+                <input type="number" id="card-limit" placeholder="Например, 500000">
             </div>
             <div class="form-group">
                 <label>Срок грейс-периода (дней)</label>
