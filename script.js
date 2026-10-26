@@ -5,6 +5,15 @@ if (document.getElementById('tx-date')) {
     document.getElementById('tx-date').valueAsDate = new Date();
 }
 
+// Автоподстановка дат для новой формы отчета (начало и конец текущего месяца)
+var now = new Date();
+if (document.getElementById('report-start')) {
+    document.getElementById('report-start').valueAsDate = new Date(now.getFullYear(), now.getMonth(), 1);
+}
+if (document.getElementById('report-end')) {
+    document.getElementById('report-end').valueAsDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+}
+
 function saveData() {
     localStorage.setItem('cards', JSON.stringify(cards));
     localStorage.setItem('transactions', JSON.stringify(transactions));
@@ -138,6 +147,7 @@ function deleteTransaction(id) {
         saveData();
     }
 }
+
 function cleanFormatDate(dateStr) {
     if (!dateStr) return '-';
     var cleanStr = dateStr.split('T')[0];
@@ -146,6 +156,54 @@ function cleanFormatDate(dateStr) {
     return [arr[2], arr[1], arr[0]].join('.');
 }
 
+// Новый изолированный модуль: Сводный отчёт расходов по картам за указанный период
+function generateReport() {
+    var startVal = document.getElementById('report-start').value;
+    var endVal = document.getElementById('report-end').value;
+    var resultDiv = document.getElementById('report-result');
+    
+    if (!startVal || !endVal) return alert('Укажите начальную и конечную дату периода');
+    
+    var startDate = new Date(startVal);
+    var endDate = new Date(endVal);
+    endDate.setHours(23, 59, 59, 999);
+    
+    var filtered = transactions.filter(function(t) {
+        var txDate = new Date(t.date);
+        return txDate >= startDate && txDate <= endDate;
+    });
+    
+    if (filtered.length === 0) {
+        resultDiv.innerHTML = '<p style="color:var(--text-muted); margin-top:10px; font-size:0.85rem;">За выбранный период расходов не зафиксировано.</p>';
+        return;
+    }
+    
+    var reportData = {};
+    filtered.forEach(function(t) {
+        if (!reportData[t.cardId]) {
+            reportData[t.cardId] = { cardName: t.cardName, total: 0 };
+        }
+        reportData[t.cardId].total += t.amount;
+    });
+    
+    var totalPeriodSum = filtered.reduce(function(sum, t) { return sum + t.amount; }, 0);
+    
+    var html = [
+        '<div style="margin-top:15px; border-top:1px dashed #555; padding-top:10px;">',
+        '<h4 style="margin-bottom:8px; font-size:0.9rem;">Сводные траты с ', cleanFormatDate(startVal), ' по ', cleanFormatDate(endVal), '</h4>',
+        '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">',
+        '<thead><tr style="border-bottom:1px solid #555; text-align:left;">',
+        '<th style="padding:4px 0;">Карта</th><th style="padding:4px 0; text-align:right;">Сумма трат</th>',
+        '</tr></thead><tbody>'
+    ];
+    
+    for (var cardId in reportData) {
+        html.push('<tr style="border-bottom:1px solid #2c2c2c;"><td style="padding:6px 0;">' + reportData[cardId].cardName + '</td><td style="padding:6px 0; text-align:right;">' + reportData[cardId].total.toLocaleString('ru-RU') + ' ₽</td></tr>');
+    }
+    
+    html.push('<tr style="font-weight:bold; color:#00a8ff;"><td style="padding:6px 0;">ОБЩАЯ СУММА:</td><td style="padding:6px 0; text-align:right;">' + totalPeriodSum.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
+    resultDiv.innerHTML = html.join('');
+}
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
@@ -232,10 +290,25 @@ function renderAll() {
         var sortedTxs = [...transactions].sort(function(a, b) { return new Date(a.deadline) - new Date(b.deadline); });
         
         if (transactions.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
         } else {
             tableBody.innerHTML = sortedTxs.map(function(t) {
-                return ['<tr><td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td><td>', t.amount.toLocaleString('ru-RU'), ' ₽</td><td>', t.minPaymentAmount.toLocaleString('ru-RU'), ' ₽<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td><td>', cleanFormatDate(t.deadline), '</td><td class="td-actions"><button class="btn-action edit" onclick="editTransaction(\'', t.id, '\')">Изменить</button><button class="btn-action delete" onclick="deleteTransaction(\'', t.id, '\')">Удалить</button></td></tr>'].join('');
+                // Вилка от 2% до 5% от первоначальной суммы покупки
+                var minRange = Math.round(t.amount * 0.02);
+                var maxRange = Math.round(t.amount * 0.05);
+                var rangeStr = minRange.toLocaleString('ru-RU') + '–' + maxRange.toLocaleString('ru-RU') + ' ₽';
+
+                return [
+                    '<tr>',
+                        '<td><strong>', t.cardName, '</strong><br><span style="color:var(--text-muted); font-size:0.75rem;">от ', cleanFormatDate(t.date), '</span></td>',
+                        '<td>', t.amount.toLocaleString('ru-RU'), ' ₽</td>',
+                        '<td>', rangeStr, '<br><span style="color:var(--text-muted); font-size:0.75rem;">до ', cleanFormatDate(t.minPaymentDeadline), '</span></td>',
+                        '<td class="td-actions" style="text-align:center;">',
+                            '<button class="btn-action edit" onclick="editTransaction(\'', t.id, '\')" style="padding: 2px 6px; font-size: 0.8rem; margin-right: 4px;">✏️</button>',
+                            '<button class="btn-action delete" onclick="deleteTransaction(\'', t.id, '\')" style="padding: 2px 6px; font-size: 0.8rem;">🗑️</button>',
+                        '</td>',
+                    '</tr>'
+                ].join('');
             }).join('');
         }
     }
