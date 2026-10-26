@@ -31,7 +31,6 @@
         .section { margin-bottom: 24px; }
         .card { background-color: var(--card-bg); border-radius: 12px; padding: 16px; margin-bottom: 10px; border: 1px solid #29292e; }
         
-        /* Сводная карточка карты в таймлайне */
         .payment-item { display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent); padding-left: 12px; }
         .payment-item.status-danger { border-left-color: var(--danger); }
         .payment-item.status-warning { border-left-color: var(--warning); }
@@ -46,7 +45,6 @@
         input:focus, select:focus { border-color: var(--accent); }
         button.btn { background-color: var(--accent); color: #000; font-weight: bold; border: none; cursor: pointer; margin-top: 5px; }
         
-        /* Полноценные кнопки действий */
         .btn-action { background-color: transparent; border: 1px solid var(--text-muted); color: var(--text-color); padding: 6px 10px; width: auto; font-size: 0.8rem; border-radius: 6px; cursor: pointer; margin-left: 6px; font-weight: 500; transition: all 0.2s; }
         .btn-action.edit { border-color: var(--warning); color: var(--warning); }
         .btn-action.edit:hover { background-color: rgba(247, 183, 49, 0.1); }
@@ -70,19 +68,16 @@
 </head>
 <body>
     <div class="container">
-        <!-- Главный экран: Общий долг -->
         <div class="summary-card">
             <p>Общий долг по всем картам</p>
             <h1 id="total-debt">0 ₽</h1>
         </div>
 
-        <!-- Секция 1: Сводный таймлайн по КАРТАМ -->
         <div class="section">
             <h2>📅 Ближайшие даты и суммы платежей до уплаты процентов</h2>
             <div id="timeline-list"></div>
         </div>
 
-        <!-- Секция 2: Запись нового расхода -->
         <div class="section card">
             <h2>➕ Записать новый расход по карте</h2>
             <div class="form-group">
@@ -100,7 +95,6 @@
             <button class="btn" onclick="addTransaction()">Зафиксировать расход</button>
         </div>
 
-        <!-- Секция 3: Детализация всех расходов -->
         <div class="section">
             <h2>📊 Детализация всех расходов</h2>
             <div class="table-container">
@@ -119,7 +113,6 @@
             </div>
         </div>
 
-        <!-- Секция 4: Управление картами -->
         <div class="section card">
             <h2>💳 Ваши карты и лимиты</h2>
             <div id="cards-manage-list" style="margin-bottom: 15px;"></div>
