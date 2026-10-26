@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>whentopay tracking</title>
     
+    <!-- Корректный Favicon кредитной карты -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://w3.org viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💳</text></svg>">
     
     <style>
@@ -25,7 +26,6 @@
         th, td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; }
         th { background: rgba(0,0,0,0.02); color: var(--text-muted); }
         
-        /* Стили для кнопок-иконок действий */
         .td-actions { display: flex; gap: 8px; justify-content: center; align-items: center; }
         .btn-action { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; padding: 0; }
         .edit-icon { background-color: #f1f2f6; color: var(--text-main); }
@@ -33,6 +33,15 @@
         .delete-icon { background-color: #ffeaa7; color: var(--danger); }
         .delete-icon:hover { background-color: #ff7675; color: #fff; }
         .btn-danger-card { background: var(--danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+        
+        .status-danger { border-left: 5px solid var(--danger); }
+        .status-warning { border-left: 5px solid var(--warning); }
+        .danger-text { color: var(--danger); font-weight: bold; }
+        .warning-text { color: var(--warning); font-weight: bold; }
+        .success-text { color: var(--success); font-weight: bold; }
+        .payment-item { display: flex; justify-content: space-between; align-items: center; }
+        .days-left { display: block; font-size: 0.8rem; margin-top: 4px; }
+        .card-manage-item { display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
@@ -42,13 +51,11 @@
         <p>Общий долг по всем картам: <strong id="total-debt">0 ₽</strong></p>
     </div>
 
-    <!-- Сводный таймлайн по картам -->
     <div class="card">
         <h2>📅 Ближайшие даты и суммы платежей</h2>
         <div id="timeline-list"></div>
     </div>
 
-    <!-- Запись расходов -->
     <div class="card">
         <h2>➕ Записать новый расход</h2>
         <div style="display:flex; flex-direction:column; gap:10px;">
@@ -58,8 +65,8 @@
             <button onclick="addTransaction()" style="padding:10px; background:var(--primary); color:#fff; border:none; border-radius:6px; font-weight:bold;">Зафиксировать расход</button>
         </div>
     </div>
-    
-    <!-- Детализация всех расходов -->
+
+    <!-- Детализация трат: ровно 4 колонки и в <thead>, и в <tbody> -->
     <div class="card" style="overflow-x: auto;">
         <h2>📊 Детализация всех расходов</h2>
         <table>
@@ -75,7 +82,6 @@
         </table>
     </div>
 
-    <!-- Модуль: Отчёт расходов за период -->
     <div class="card" id="report-section">
         <h2>📅 Отчёт расходов за период</h2>
         <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 15px;">
@@ -92,7 +98,6 @@
         <div id="report-result"></div>
     </div>
 
-    <!-- Управление картами -->
     <div class="card">
         <h2>💳 Ваши карты и лимиты</h2>
         <div id="cards-manage-list"></div>
