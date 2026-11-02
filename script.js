@@ -5,6 +5,11 @@ if (document.getElementById('tx-date')) {
     document.getElementById('tx-date').valueAsDate = new Date();
 }
 
+// Автоподстановка даты для формы внесения платежей
+if (document.getElementById('pay-date')) {
+    document.getElementById('pay-date').valueAsDate = new Date();
+}
+
 // Автоподстановка дат для новой формы отчета (начало и конец текущего месяца)
 var now = new Date();
 if (document.getElementById('report-start')) {
@@ -90,6 +95,66 @@ function calculateMinPaymentDate(purchaseDateStr) {
     return [targetYear, monthFormatted, '30'].join('-');
 }
 
+// Функция внесения платежа по кредитной карте с банковским распределением FIFO
+function addPayment() {
+    var cardId = document.getElementById('pay-card').value;
+    var amount = parseFloat(document.getElementById('pay-amount').value);
+    var dateValue = document.getElementById('pay-date').value;
+    
+    if (!cardId || isNaN(amount) || amount <= 0 || !dateValue) {
+        return alert('Заполните корректно данные о платеже');
+    }
+    
+    // Структурируем старые транзакции, закладывая внутренний остаток долга
+    transactions.forEach(function(t) {
+        if (t.spent === undefined) {
+            t.spent = t.isPayment ? 0 : t.amount;
+        }
+    });
+
+    var remainingPayment = amount;
+    
+    // Сортируем транзакции по дате покупки (от старых к новым), исключая закрытые
+    var activeTxs = transactions.filter(function(t) {
+        return t.cardId === cardId && !t.isPayment && t.spent > 0;
+    }).sort(function(a, b) {
+        return new Date(a.date) - new Date(b.date);
+    });
+    
+    // Погашение долга по цепочке FIFO
+    for (var i = 0; i < activeTxs.length; i++) {
+        var t = activeTxs[i];
+        if (remainingPayment <= 0) break;
+        
+        if (remainingPayment >= t.spent) {
+            remainingPayment -= t.spent;
+            t.spent = 0;
+        } else {
+            t.spent -= remainingPayment;
+            remainingPayment = 0;
+        }
+    }
+    
+    // Добавляем запись о платеже (с отрицательной суммой для сохранения баланса лимитов)
+    var card = cards.find(function(c) { return c.id === cardId; });
+    transactions.push({
+        id: Date.now().toString(),
+        cardId: cardId,
+        cardName: card.name,
+        amount: -amount,
+        spent: 0,
+        date: dateValue,
+        deadline: dateValue,
+        minPaymentAmount: 0,
+        minPaymentDeadline: dateValue,
+        isPayment: true
+    });
+
+    document.getElementById('pay-amount').value = '';
+    alert('Платёж учтен. Задолженность по покупкам и минимальные платежи обновлены!');
+    saveData();
+}
+
 function addTransaction() {
     var cardId = document.getElementById('tx-card').value;
     var amount = parseFloat(document.getElementById('tx-amount').value);
@@ -105,6 +170,7 @@ function addTransaction() {
         cardId: cardId,
         cardName: card.name,
         amount: amount,
+        spent: amount, // Изначальный непогашенный остаток равен сумме расхода
         date: dateValue,
         deadline: calculatedDeadline,
         minPaymentAmount: Math.round(amount * 0.035),
@@ -114,7 +180,6 @@ function addTransaction() {
     document.getElementById('tx-amount').value = '';
     saveData();
 }
-
 function editTransaction(id) {
     var tx = transactions.find(function(t) { return t.id === id; });
     if (!tx) return;
@@ -125,7 +190,7 @@ function editTransaction(id) {
     if (isNaN(parsedAmount) || parsedAmount <= 0) return alert('Некорректная сумма');
 
     var newDate = prompt('Введите новую дату в формате ГГГГ-ММ-ДД:', tx.date);
-    if (newDate === null) return;
+    if (newDate === null);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) return alert('Неверный формат даты');
 
     var card = cards.find(function(c) { return c.id === tx.cardId; });
@@ -133,6 +198,7 @@ function editTransaction(id) {
     var cardGrace = card ? card.graceDays : 120;
 
     tx.amount = parsedAmount;
+    tx.spent = parsedAmount; 
     tx.date = newDate;
     tx.deadline = calculateGraceDeadline(newDate, cardGrace, cardType);
     tx.minPaymentAmount = Math.round(parsedAmount * 0.035);
@@ -156,7 +222,6 @@ function cleanFormatDate(dateStr) {
     return [arr[2], arr[1], arr[0]].join('.');
 }
 
-// Новый изолированный модуль: Сводный отчёт расходов по картам за указанный период
 function generateReport() {
     var startVal = document.getElementById('report-start').value;
     var endVal = document.getElementById('report-end').value;
@@ -170,7 +235,7 @@ function generateReport() {
     
     var filtered = transactions.filter(function(t) {
         var txDate = new Date(t.date);
-        return txDate >= startDate && txDate <= endDate;
+        return txDate >= startDate && txDate <= endDate && !t.isPayment;
     });
     
     if (filtered.length === 0) {
@@ -204,11 +269,19 @@ function generateReport() {
     html.push('<tr style="font-weight:bold; color:#00a8ff;"><td style="padding:6px 0;">ОБЩАЯ СУММА:</td><td style="padding:6px 0; text-align:right;">' + totalPeriodSum.toLocaleString('ru-RU') + ' ₽</td></tr></tbody></table></div>');
     resultDiv.innerHTML = html.join('');
 }
+
 function renderAll() {
     var txCardSelect = document.getElementById('tx-card');
     if (txCardSelect) {
         txCardSelect.innerHTML = cards.map(function(c) { 
             return ['<option value="', c.id, '">', c.name, '</option>'].join(''); 
+        }).join('');
+    }
+    
+    var payCardSelect = document.getElementById('pay-card');
+    if (payCardSelect) {
+        payCardSelect.innerHTML = cards.map(function(c) { 
+            return '<option value="' + c.id + '">' + c.name + '</option>'; 
         }).join('');
     }
     
@@ -220,13 +293,17 @@ function renderAll() {
     transactions.forEach(function(t) {
         if (cardStats[t.cardId]) {
             cardStats[t.cardId].totalSpent += t.amount;
-            cardStats[t.cardId].totalMinPay += t.minPaymentAmount;
             
-            if (!cardStats[t.cardId].earliestDeadline || new Date(t.deadline) < new Date(cardStats[t.cardId].earliestDeadline)) {
-                cardStats[t.cardId].earliestDeadline = t.deadline;
-            }
-            if (!cardStats[t.cardId].minPayDeadline || new Date(t.minPaymentDeadline) < new Date(cardStats[t.cardId].minPayDeadline)) {
-                cardStats[t.cardId].minPayDeadline = t.minPaymentDeadline;
+            var currentSpent = (t.spent !== undefined) ? t.spent : (t.isPayment ? 0 : t.amount);
+            if (currentSpent > 0) {
+                cardStats[t.cardId].totalMinPay += Math.round(currentSpent * 0.035);
+                
+                if (!cardStats[t.cardId].earliestDeadline || new Date(t.deadline) < new Date(cardStats[t.cardId].earliestDeadline)) {
+                    cardStats[t.cardId].earliestDeadline = t.deadline;
+                }
+                if (!cardStats[t.cardId].minPayDeadline || new Date(t.minPaymentDeadline) < new Date(cardStats[t.cardId].minPayDeadline)) {
+                    cardStats[t.cardId].minPayDeadline = t.minPaymentDeadline;
+                }
             }
         }
     });
@@ -257,7 +334,7 @@ function renderAll() {
         
         var activeCardsData = cards.map(function(c) {
             return { card: c, stats: cardStats[c.id] };
-        }).filter(function(item) { return item.stats && item.stats.totalSpent > 0; })
+        }).filter(function(item) { return item.stats && item.stats.totalSpent > 0 && item.stats.totalMinPay > 0; })
           .sort(function(a, b) {
               if (!a.stats.earliestDeadline) return 1;
               if (!b.stats.earliestDeadline) return -1;
@@ -284,7 +361,6 @@ function renderAll() {
             }).join('');
         }
     }
-
     var tableBody = document.getElementById('transactions-table-body');
     if (tableBody) {
         var sortedTxs = [...transactions].sort(function(a, b) { return new Date(a.deadline) - new Date(b.deadline); });
@@ -293,10 +369,18 @@ function renderAll() {
             tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Трат не зафиксировано</td></tr>';
         } else {
             tableBody.innerHTML = sortedTxs.map(function(t) {
-                // Вилка от 2% до 5% от первоначальной суммы покупки
-                var minRange = Math.round(t.amount * 0.02);
-                var maxRange = Math.round(t.amount * 0.05);
-                var rangeStr = minRange.toLocaleString('ru-RU') + '–' + maxRange.toLocaleString('ru-RU') + ' ₽';
+                var remDebt = (t.spent !== undefined) ? t.spent : (t.isPayment ? 0 : t.amount);
+                
+                var rangeStr = '-';
+                if (!t.isPayment && remDebt > 0) {
+                    var minRange = Math.round(remDebt * 0.02);
+                    var maxRange = Math.round(remDebt * 0.05);
+                    rangeStr = minRange.toLocaleString('ru-RU') + '–' + maxRange.toLocaleString('ru-RU') + ' ₽';
+                } else if (remDebt === 0 && !t.isPayment) {
+                    rangeStr = '✅ Погашено';
+                } else if (t.isPayment) {
+                    rangeStr = '💳 Пополнение';
+                }
 
                 return [
                     '<tr>',
@@ -314,4 +398,5 @@ function renderAll() {
     }
 }
 
+// Первоначальный автоматический запуск перерисовки
 renderAll();
